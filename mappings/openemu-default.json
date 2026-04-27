@@ -1,0 +1,22 @@
+{
+  "profile": "openemu-default",
+  "bindings": {
+    "buttonA": "space",
+    "buttonB": "z",
+    "buttonX": "x",
+    "buttonY": "a",
+    "leftShoulder": "q",
+    "rightShoulder": "w",
+    "leftTrigger": "one",
+    "rightTrigger": "two",
+    "dpadUp": "upArrow",
+    "dpadDown": "downArrow",
+    "dpadLeft": "leftArrow",
+    "dpadRight": "rightArrow",
+    "leftThumbstickButton": "c",
+    "rightThumbstickButton": "v",
+    "buttonMenu": "returnKey",
+    "buttonOptions": "escape",
+    "buttonHome": "escape"
+  }
+}

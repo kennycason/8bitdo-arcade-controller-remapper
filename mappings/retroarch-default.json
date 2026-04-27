@@ -1,0 +1,22 @@
+{
+  "profile": "retroarch-default",
+  "bindings": {
+    "buttonA": "x",
+    "buttonB": "z",
+    "buttonX": "s",
+    "buttonY": "a",
+    "leftShoulder": "q",
+    "rightShoulder": "w",
+    "leftTrigger": "one",
+    "rightTrigger": "two",
+    "dpadUp": "upArrow",
+    "dpadDown": "downArrow",
+    "dpadLeft": "leftArrow",
+    "dpadRight": "rightArrow",
+    "leftThumbstickButton": "c",
+    "rightThumbstickButton": "v",
+    "buttonMenu": "returnKey",
+    "buttonOptions": "rightShift",
+    "buttonHome": "escape"
+  }
+}
