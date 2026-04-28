@@ -1,0 +1,19 @@
+{
+  "bindings" : {
+    "buttonA" : "z",
+    "buttonB" : "rightArrow",
+    "buttonMenu" : "returnKey",
+    "buttonOptions" : "rightShift",
+    "buttonX" : "x",
+    "buttonY" : "s",
+    "dpadDown" : "leftArrow",
+    "dpadLeft" : "q",
+    "dpadRight" : "upArrow",
+    "dpadUp" : "downArrow",
+    "leftShoulder" : "w",
+    "leftTrigger" : "returnKey",
+    "rightShoulder" : "a",
+    "rightTrigger" : "rightShift"
+  },
+  "profile" : "custom"
+}

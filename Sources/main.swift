@@ -151,6 +151,7 @@ final class Remapper {
     private let debug: Bool
     private var pollTimer: DispatchSourceTimer?
     private var hidManager: IOHIDManager?
+    private var hatReleaseTimer: DispatchSourceTimer?
     var onButtonPress: ((InputName, Bool) -> Void)?
 
     init(bindings: [InputName: KeyName], debug: Bool) {
@@ -163,6 +164,18 @@ final class Remapper {
         // doesn't seize the device and swallow events.
         startHIDFallback()
 
+        if hidManager != nil {
+            // HID seized the device — it's the sole input source.
+            // Do NOT start GC polling, as the GC framework won't see button
+            // presses and will immediately cancel every HID-reported press.
+            print("Listening for controller input (HID exclusive)...")
+            if debug {
+                print("Debug mode enabled. HID exclusive — GC polling disabled.")
+            }
+            return
+        }
+
+        // HID seizure failed — fall back to GameController framework.
         if #available(macOS 11.3, *) {
             GCController.shouldMonitorBackgroundEvents = true
         }
@@ -188,9 +201,9 @@ final class Remapper {
         }
 
         startPollingFallback()
-        print("Listening for controller input...")
+        print("Listening for controller input (GC polling)...")
         if debug {
-            print("Debug mode enabled. Polling + HID fallback active.")
+            print("Debug mode enabled. GC polling + value change active.")
         }
     }
 
@@ -525,16 +538,28 @@ final class Remapper {
     }
 
     private func handleHatSwitch(_ value: Int) {
+        // Cancel any pending neutral release — a new hat value arrived in time.
+        hatReleaseTimer?.cancel()
+        hatReleaseTimer = nil
+
         let up = value == 0 || value == 1 || value == 7
         let right = value == 1 || value == 2 || value == 3
         let down = value == 3 || value == 4 || value == 5
         let left = value == 5 || value == 6 || value == 7
 
         if value >= 8 || value < 0 {
-            handle(input: .dpadUp, pressed: false)
-            handle(input: .dpadRight, pressed: false)
-            handle(input: .dpadDown, pressed: false)
-            handle(input: .dpadLeft, pressed: false)
+            // Neutral — debounce the release to avoid dropping directions
+            // during hat transitions (e.g. down -> down+right on a hitbox).
+            let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+            timer.schedule(deadline: .now() + .milliseconds(8))
+            timer.setEventHandler { [weak self] in
+                self?.handle(input: .dpadUp, pressed: false)
+                self?.handle(input: .dpadRight, pressed: false)
+                self?.handle(input: .dpadDown, pressed: false)
+                self?.handle(input: .dpadLeft, pressed: false)
+            }
+            timer.resume()
+            hatReleaseTimer = timer
             return
         }
 
@@ -661,7 +686,7 @@ private func configureKeyTapCallback(
     return nil
 }
 
-func runConfigure(outputPath: String) {
+func runConfigure(outputPath: String, reset: Bool) {
     requestAccessibilityIfNeeded()
     guard isAccessibilityTrusted() else {
         print("Accessibility permission required for key capture. Please grant it and retry.")
@@ -669,6 +694,19 @@ func runConfigure(outputPath: String) {
     }
 
     let session = ConfigureSession()
+
+    // Load existing bindings from the file unless --reset is passed
+    if !reset {
+        let url = URL(fileURLWithPath: outputPath)
+        if let data = try? Data(contentsOf: url),
+           let profile = try? JSONDecoder().decode(MappingProfile.self, from: data)
+        {
+            session.bindings = profile.bindings
+            configureBindings = session.bindings
+            print("Loaded \(profile.bindings.count) existing binding(s) from \(outputPath)")
+            print("New mappings will be merged on top. Use --reset to start fresh.")
+        }
+    }
     let sessionPtr = Unmanaged.passUnretained(session).toOpaque()
 
     // Reuse the exact same Remapper (HID seize + GC discovery) that works for normal mode.
@@ -847,6 +885,8 @@ func printUsage() {
           --debug            Print all HID events and key mappings
           --configure        Interactive mode: press keys to build a mapping file
                              Saves to --mapping path or ./mapping.json
+                             Merges with existing file by default (PATCH)
+          --reset            With --configure, start fresh instead of merging
 
         If --mapping is not provided, built-in defaults are used.
         """
@@ -857,6 +897,7 @@ let args = CommandLine.arguments
 var mappingPath: String?
 var debug = false
 var configure = false
+var reset = false
 var index = 1
 
 while index < args.count {
@@ -879,6 +920,12 @@ while index < args.count {
         continue
     }
 
+    if arg == "--reset" {
+        reset = true
+        index += 1
+        continue
+    }
+
     if arg == "--help" || arg == "-h" {
         printUsage()
         exit(0)
@@ -891,7 +938,7 @@ while index < args.count {
 
 if configure {
     let outputPath = mappingPath ?? "mapping.json"
-    runConfigure(outputPath: outputPath)
+    runConfigure(outputPath: outputPath, reset: reset)
     // runConfigure never returns (calls exit)
 }
 
