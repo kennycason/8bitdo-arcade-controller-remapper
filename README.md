@@ -66,6 +66,17 @@ This walks through each controller button and asks you to press the keyboard key
 
 ### RetroArch default mapping
 
+Retroarch Controls
+q   L/angle down
+w   R/angle up
+a   item select
+s   shoot
+z   run
+x   jump
+enter   start
+right shift seelct/item deselect 
+
+
 | Controller | Key | RetroArch action |
 |-----------|-----|-----------------|
 | A | x | RetroPad A |
