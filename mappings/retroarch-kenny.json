@@ -7,7 +7,7 @@
     "buttonX" : "x",
     "buttonY" : "s",
     "dpadDown" : "leftArrow",
-    "dpadLeft" : "q",
+    "dpadLeft" : "rightShift",
     "dpadRight" : "upArrow",
     "dpadUp" : "downArrow",
     "leftShoulder" : "a",
