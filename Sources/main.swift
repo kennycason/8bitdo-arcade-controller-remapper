@@ -151,7 +151,7 @@ final class Remapper {
     private let debug: Bool
     private var pollTimer: DispatchSourceTimer?
     private var hidManager: IOHIDManager?
-    private var hatReleaseTimer: DispatchSourceTimer?
+    private var hatDirectionTimers: [InputName: DispatchSourceTimer] = [:]
     var onButtonPress: ((InputName, Bool) -> Void)?
 
     init(bindings: [InputName: KeyName], debug: Bool) {
@@ -538,35 +538,36 @@ final class Remapper {
     }
 
     private func handleHatSwitch(_ value: Int) {
-        // Cancel any pending neutral release — a new hat value arrived in time.
-        hatReleaseTimer?.cancel()
-        hatReleaseTimer = nil
+        let isNeutral = value >= 8 || value < 0
+        let up = !isNeutral && (value == 0 || value == 1 || value == 7)
+        let right = !isNeutral && (value == 1 || value == 2 || value == 3)
+        let down = !isNeutral && (value == 3 || value == 4 || value == 5)
+        let left = !isNeutral && (value == 5 || value == 6 || value == 7)
 
-        let up = value == 0 || value == 1 || value == 7
-        let right = value == 1 || value == 2 || value == 3
-        let down = value == 3 || value == 4 || value == 5
-        let left = value == 5 || value == 6 || value == 7
-
-        if value >= 8 || value < 0 {
-            // Neutral — debounce the release to avoid dropping directions
-            // during hat transitions (e.g. down -> down+right on a hitbox).
-            let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-            timer.schedule(deadline: .now() + .milliseconds(8))
-            timer.setEventHandler { [weak self] in
-                self?.handle(input: .dpadUp, pressed: false)
-                self?.handle(input: .dpadRight, pressed: false)
-                self?.handle(input: .dpadDown, pressed: false)
-                self?.handle(input: .dpadLeft, pressed: false)
+        // Debounce each direction's RELEASE independently.
+        // Presses are instant; releases wait 8ms so hat transitions like
+        // down(4) -> neutral(8) -> down+right(3) don't briefly drop "down".
+        for (input, pressed) in [
+            (InputName.dpadUp, up), (.dpadRight, right),
+            (.dpadDown, down), (.dpadLeft, left),
+        ] {
+            if pressed {
+                // Cancel any pending release and press immediately
+                hatDirectionTimers[input]?.cancel()
+                hatDirectionTimers[input] = nil
+                handle(input: input, pressed: true)
+            } else if lastPressedState[input] == true && hatDirectionTimers[input] == nil {
+                // Direction was held but hat no longer reports it — debounce the release
+                let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+                timer.schedule(deadline: .now() + .milliseconds(8))
+                timer.setEventHandler { [weak self] in
+                    self?.hatDirectionTimers[input] = nil
+                    self?.handle(input: input, pressed: false)
+                }
+                timer.resume()
+                hatDirectionTimers[input] = timer
             }
-            timer.resume()
-            hatReleaseTimer = timer
-            return
         }
-
-        handle(input: .dpadUp, pressed: up)
-        handle(input: .dpadRight, pressed: right)
-        handle(input: .dpadDown, pressed: down)
-        handle(input: .dpadLeft, pressed: left)
     }
 
     private func handle(input: InputName, pressed: Bool) {
